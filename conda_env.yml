@@ -1,0 +1,26 @@
+# for creation of necessary conda environment
+name: pyr_classifier  # environment name
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - astropy
+  - jupyter
+  - matplotlib
+  - mkdocs
+  - mkdocs-jupyter
+  - mkdocs-material
+  - mkdocstrings
+  - numpy
+  - pathlib
+  - pandas
+  - pymdown-extensions
+  - python <= 3.8
+  - python-kaleido
+  - scipy
+  - scikit-learn
+  - scikit-image
+  - sunpy
+  - notebook
+  - keras
+  - tensorflow

@@ -1,0 +1,65 @@
+site_name: Pyrheliometer Classifier
+
+site_description: Pyrheliometer Classifier Documentation
+authors:
+    - Tamar Ervin
+
+# repository information
+repo_url: https://github.com/tamarervin/pyr_classifier
+edit_uri: blob/master/mkdocs/docs/
+
+# site navigation
+nav:
+  - Home: index.md
+  - Function Documentation: functions.md
+  - Example Plots: plots.md
+  - Classifier Outline: classifier.ipynb
+  - Example: example.ipynb
+
+# theme
+theme:
+  name: material
+  language: en
+  palette:
+    primary: indigo
+    accent: light blue
+#  logo: img/sun.png
+#  favicon: img/sun.png
+  font:
+    code: Oswald
+  features:
+    - navigation.top
+    - header.autohide
+
+
+# plugins
+plugins:
+  - search:
+      lang: en
+  - mkdocs-jupyter:
+      ignore_h1_titles: True
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys
+            - sys.path.append('../')
+          selection:
+            new_path_syntax: true
+      docstring_style: numpy
+#  - numkdoc
+
+# extensions
+markdown_extensions:
+  - attr_list
+  - admonition
+  - pymdownx.critic
+  - pymdownx.mark
+  - pymdownx.tabbed
+  - pymdownx.arithmatex
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML
+  - javascripts/config.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
