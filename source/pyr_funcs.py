@@ -19,9 +19,15 @@ def read_pyr(pyr_file):
     """
     Function to take in .tel file with Pyr data and return relevant information.
 
-    :param str pyr_file: file patth
-    :return: dates: list of dates, flux: list of flux values, voltage: list of voltage values
-    :rtype: DateTime, float, float
+    :param str pyr_file: file path
+    :return:
+        - dates: list of dates
+        - flux: list of flux values
+        - voltage: list of voltage values
+    :rtype:
+        - List[DateTime]
+        - List[float]
+        - List[float]
     """
 
     # read in file
@@ -43,12 +49,16 @@ def read_pyr(pyr_file):
 def parse_dates(dates, flux):
     """
     function to parse Pyr data by date and look at only when solar data is collected
-    :param DateTime dates: list of dates
-    :param float flux: list of flux values
-    :return: days: list of dates, full_full: list of full flux values, noon_flux: list of solar noon flux values
-    :rtype: DateTime
-    :rtype: float
-    :rtype: float
+    :param List[DateTime] dates: list of dates
+    :param List[float] flux: list of flux values
+    :return:
+        - days - list of days
+        - full_flux - list of full flux values
+        - noon_flux - list of solar noon flux values
+    :rtype:
+        - List[str]
+        - List[float]
+        - List[float]
     """
 
     # split dates into days and times
@@ -57,18 +67,26 @@ def parse_dates(dates, flux):
         dates_list.append(d.date())
         times_list.append(d.time())
 
+    # turn lists into arrays
+    dates_list = np.array(dates_list)
+    times_list = np.array(times_list)
+
+    # get unique dates
     unique_days = np.unique(dates_list)
     unique_days = sorted(unique_days)
+
+    # parse dates
     full_flux, noon_flux, days = [], [], []
     for i, d in enumerate(unique_days):
-        d_use = np.isin(dates_list, d)
-        d_times = np.array(times_list)[d_use]
+        d_use = np.where(d == dates_list)
+        d_times = times_list[d_use]
         if len(d_times) == 3600*24:
             d_flux = flux[d_use]
             t_use = np.logical_and(d_times > time(hour=9, minute=30), d_times < time(hour=15, minute=30))
+            noon_use = np.logical_and(d_times > time(hour=11, minute=30), d_times < time(hour=12, minute=30))
             days.append(d)
             full_flux.append(d_flux)
-            noon_flux.append(d_flux[t_use])
+            noon_flux.append(d_flux[noon_use])
 
     return days, full_flux, noon_flux
 
@@ -76,14 +94,16 @@ def parse_dates(dates, flux):
 def parse_files(files, dir_path):
     """
     function to parse files and return dates, full flux, noon flux
-    :param str files: list of files
+    :param List[str] files: list of files
     :param str dir_path: directory path
-    :return: list of days
-    :rtype: str
-    :return: list of full flux values
-    :rtype: float
-    :return: list of solar noon flux values
-    :rtype: float
+    :returns:
+        - days - list of days
+        - full_flux - list of full flux values
+        - noon_flux - list of solar noon flux values
+    :rtype:
+        - List[str]
+        - List[float]
+        - List[float]
     """
 
     dates, flux, voltage = [], [], []
@@ -102,18 +122,21 @@ def parse_files(files, dir_path):
     return days, full_flux, noon_flux
 
 
-def tsi_model(days, date_flux, lat=32.2, lon=-111, tz='US/Arizona', elevation=700, name='Tucson'):
+def tsi_model(days, full_flux, lat=32.2, lon=-111, tz='US/Arizona', elevation=735, name='Tucson'):
     """
     function to create TSI model for specific days and location
 
-    :param str days: list of unique days
-    :param float date_flux: list of flux arrays corresponding to each date
+    :param List[str] days: list of unique days
+    :param List[float] full_flux: list of flux arrays corresponding to each date
     :param float lat: latitude
     :param float lon: longitude
-    :return: full flux model
-    :rtype: float
-    :return: solar noon flux model
-    :rtype: float
+    :param str tz: Timezone
+    :param int elevation: elevation value
+    :param str name: location name
+    :returns:full_model - full flux model
+    :return: noon_model - solar noon flux model
+    :rtype: List[float]
+    :rtype: List[float]
     """
 
     # location using pvlib package -- latitude, longitude, timezone, altitude, latitude
@@ -122,61 +145,70 @@ def tsi_model(days, date_flux, lat=32.2, lon=-111, tz='US/Arizona', elevation=70
     full_model, noon_model = [], []
 
     for i, d in enumerate(days):
+        # create times array for model
         times = pd.date_range(start=d, end=d + timedelta(days=1), freq='1S', tz=loc.tz)
+        # times = times
+
         # get turbidity
         turbidity = clearsky.lookup_linke_turbidity(times, lat, lon, interp_turbidity=False)
+
+        # create model
         weather = loc.get_clearsky(times, linke_turbidity=turbidity)
-        times_list = []
-        for d in times:
-            times_list.append(d.time())
-        mod = weather.dni.values + np.min(date_flux[i])
-        times_comp = np.array(times_list)
-        t_use = np.logical_and(times_comp >= time(hour=9, minute=30), times_comp < time(hour=15, minute=30))
+
+        # scale model
+        mod = weather.dni.values + np.min(full_flux[i])
+
+        # create full model and solar noon model
+        times = times.time
+        t_use = np.logical_and(times >= time(hour=9, minute=30), times < time(hour=15, minute=30))
+        noon_use = np.logical_and(times >= time(hour=11, minute=30), times < time(hour=12, minute=30))
         full_model.append(mod[:-1])
-        noon_model.append(mod[t_use])
+        noon_model.append(mod[noon_use])
 
     return full_model, noon_model
 
 
-def stat_parameters(days, full_flux, noon_flux, full_model):
+def stat_parameters(days, full_flux, noon_flux, full_model, noon_model):
     """
     function to calculate statistical parameters for clustering
-    :param str days: list of unique days
-    :param float full_flux: list of full flux values
-    :param float noon_flux: list of solar noon flux values
-    :param float full_model: list of full flux model
+    :param List[str] days: list of unique days
+    :param List[float] full_flux: list of full flux values
+    :param List[float] noon_flux: list of solar noon flux values
+    :param List[float] full_model: list of full flux model
+    :param List[float] noon_model: list of solar noon flux model
     :return: list of statistical parameters for clustering
-    :rtype: float
+    :rtype: List[float]
     """
 
     # scaled residual standard deviation
-    scal_f_std, scal_s_mean, good_flux, good_model = [], [], [], []
+    scal_f_std, scal_n_std, scal_s_mean, good_flux, good_model = [], [], [], [], []
     for i, d in enumerate(days):
-        # if len(full_flux[i]) == len(full_model[i]):
         good_flux.append(full_flux[i])
         good_model.append(full_model[i])
         f_res = full_flux[i] - (full_model[i] * 1.08)
         scal_f_std.append(np.std(f_res))
+        f_res = noon_flux[i] - (noon_model[i] * 1.08)
+        scal_n_std.append(np.std(f_res))
         scal_s_mean.append((np.mean(noon_flux[i])))
-        # else:
-        #     pass
     scal_f_std = np.array(scal_f_std)
     scal_s_mean = np.array(scal_s_mean)
+    scal_n_std = np.array(scal_n_std)
 
     # ([std values of scaled full flux array, mean values of scaled solar noon flux array])
-    stats_params = np.column_stack((scal_f_std, scal_s_mean))
+    stat_params = np.column_stack((scal_f_std, scal_n_std, scal_s_mean))
 
-    return stats_params
+    return stat_params
 
 
-def classify_days(days, stats_params, model_path):
+def classify_days(days, stats_params, model_path, csv_name):
     """
     function to classify days using model and map labels to usable classes
-    :param str days: list of unique days
-    :param float stats_params: list of statistical parameters for clustering
+    :param List[str] days: list of unique days
+    :param List[float] stats_params: list of statistical parameters for clustering
     :param str model_path: path to clustering model
-    :return: list labeled dates
-    :rtype: int
+    :param str csv_name: path to save csv
+    :return: dataframe with dates and labels
+    :rtype: DataFrame
     """
 
     # load model
@@ -187,23 +219,48 @@ def classify_days(days, stats_params, model_path):
     labels = np.array(labels)
 
     # map labels to correct class
-    mapping = {2: 0, 4: 1, 0: 2, 1: 3, 3: 4}
-    mapped = [mapping[i] for i in labels]
+    # mapping = {4: 0, 2: 1, 0: 2, 5: 3, 3: 4, 1: 5}
+    # mapped = [mapping[i] for i in labels]
+    # mapped = np.array(mapped)
 
     # create array of dates and labels
-    date_labels = np.column_stack((days, mapped))
+    date_labels = np.column_stack((days, labels))
 
-    return date_labels
+    # save to csv
+    df = save_to_csv(date_labels, csv_name)
+
+    return df
 
 
-def classifier_model(dir_path, model_path):
+def save_to_csv(date_labels, csv_name):
+    """
+    function to save labeled dates to csv
+    :param date_labels: array with dates and corresponding labels
+    :param str csv_name: path to save csv
+    :return: dataframe with dates and labels
+    :rtype: DataFrame
+    """
+    # create pandas dataframe
+    df = pd.DataFrame(date_labels)
+
+    # add column headers
+    df.columns = ['Date', 'Label']
+
+    # save csv
+    df.to_csv(csv_name)
+
+    return df
+
+
+def classifier_model(dir_path, model_path, csv_name):
     """
     function for full classifier model
 
-    :param str model_path: path to clustering model
     :param str dir_path: path to directory with telemetry data
-    :return: list labeled dates
-    :rtype: int
+    :param str model_path: path to clustering model
+    :param str csv_name: path to save csv
+    :return: dataframe with dates and labels
+    :rtype: DataFrame
     """
 
     # list out files
@@ -211,7 +268,7 @@ def classifier_model(dir_path, model_path):
     files = sorted(files)
 
     # parse files
-    days, full_flux, noon_flux = parse_files(files, dir_path)
+    days, times_list, full_flux, noon_flux = parse_files(files, dir_path)
 
     # default location parameters - NEID spectrometer (Kitt Peak, Tuscon AZ)
     lat = 32.2
@@ -227,6 +284,7 @@ def classifier_model(dir_path, model_path):
     stats_params = stat_parameters(days, full_flux, noon_flux, full_model)
 
     # classify dates based on trained model
-    date_labels = classify_days(days, stats_params, model_path)
+    date_labels = classify_days(days, stats_params, model_path, csv_name)
 
     return date_labels
+

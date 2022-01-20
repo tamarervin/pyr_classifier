@@ -13,7 +13,6 @@ from datetime import time
 from source import pyr_funcs as pf
 from sklearn.cluster import KMeans
 
-
 # get the files
 dir_path = "/Users/tervin/pyr_classifier/pyr_data"
 files = os.listdir(dir_path)
@@ -38,30 +37,34 @@ dates_list, times_list = [], []
 for d in use_dates:
     dates_list.append(d.date())
     times_list.append(d.time())
+dates_list = np.array(dates_list)
+times_list = np.array(times_list)
 
-# parse dates
+# get unique dates
 unique_days = np.unique(dates_list)
 unique_days = sorted(unique_days)
+unique_days = [unique_days[x] for x in np.arange(0, len(unique_days), 10)]
+
+# parse dates
 full_flux, noon_flux, days = [], [], []
-unique_days = [unique_days[x] for x in np.arange(0, len(unique_days), 12)]
 for i, d in enumerate(unique_days):
-    d_use = np.isin(dates_list, d)
-    d_times = np.array(times_list)[d_use]
-    if len(d_times) == 3600*24:
-        print(i)
+    d_use = np.where(d == dates_list)
+    d_times = times_list[d_use]
+    if len(d_times) == 3600 * 24:
         d_flux = use_flux[d_use]
         t_use = np.logical_and(d_times > time(hour=9, minute=30), d_times < time(hour=15, minute=30))
+        noon_use = np.logical_and(d_times > time(hour=11, minute=30), d_times < time(hour=12, minute=30))
         days.append(d)
         full_flux.append(d_flux)
-        noon_flux.append(d_flux[t_use])
+        noon_flux.append(d_flux[noon_use])
 
 # create model for ideal days
 # default location parameters - NEID spectrometer (Kitt Peak, Tuscon AZ)
 lat = 32.2
 lon = -111
 tz = 'US/Arizona'
-elevation=735
-name='Tucson'
+elevation = 735
+name = 'Tucson'
 
 # create TSI model
 full_model, noon_model = pf.tsi_model(days, full_flux, lat, lon, tz, elevation, name)
@@ -71,7 +74,7 @@ stat_params = pf.stat_parameters(days, full_flux, noon_flux, full_model)
 
 # use elbow method to determine best number of clusters
 sum_of_squared_distances = []
-K = range(2,15)
+K = range(2, 15)
 for k in K:
     k_means = KMeans(n_clusters=k)
     model = k_means.fit(stat_params)
@@ -85,7 +88,7 @@ plt.show()
 plt.savefig('/Users/tervin/pyr_classifier/images/elbow_method.png')
 
 # create actual model
-kmeans = KMeans(n_clusters=5, random_state=0).fit(stat_params)
+kmeans = KMeans(n_clusters=6, random_state=0).fit(stat_params)
 labels = kmeans.labels_
 
 # plot labels
@@ -101,23 +104,51 @@ one = np.where(labels == 1)
 two = np.where(labels == 2)
 three = np.where(labels == 3)
 four = np.where(labels == 4)
-# five = np.where(labels == 5)
+five = np.where(labels == 5)
 x = np.arange(0, len(days))
-plt.scatter(stat_params[:,0][zero], stat_params[:,1][zero], color='red', edgecolors='k', linewidths=0.8, label='Label Zero')
-plt.scatter(stat_params[:,0][one], stat_params[:,1][one], color='orange', edgecolors='k', linewidths=0.8, label='Label One')
-plt.scatter(stat_params[:,0][two], stat_params[:,1][two], color='green', edgecolors='k', linewidths=0.8, label='Label Two')
-plt.scatter(stat_params[:,0][three], stat_params[:,1][three], color='blue', edgecolors='k', linewidths=0.8, label='Label Three')
-plt.scatter(stat_params[:,0][four], stat_params[:,1][four], color='purple', edgecolors='k', linewidths=0.8, label='Label Four')
-# plt.scatter(stat_params[:,0][five], stat_params[:,1][five], color='pink', edgecolors='k', linewidths=0.8, label='Label Five')
-plt.xlabel('Residual Standard Deviation')
-plt.ylabel('Solar Noon Mean')
+plt.scatter(stat_params[:, 0][zero], stat_params[:, 1][zero], color='red', edgecolors='k', linewidths=0.8,
+            label='Label Zero')
+plt.scatter(stat_params[:, 0][one], stat_params[:, 1][one], color='orange', edgecolors='k', linewidths=0.8,
+            label='Label One')
+plt.scatter(stat_params[:, 0][two], stat_params[:, 1][two], color='green', edgecolors='k', linewidths=0.8,
+            label='Label Two')
+plt.scatter(stat_params[:, 0][three], stat_params[:, 1][three], color='blue', edgecolors='k', linewidths=0.8,
+            label='Label Three')
+plt.scatter(stat_params[:, 0][four], stat_params[:, 1][four], color='purple', edgecolors='k', linewidths=0.8,
+            label='Label Four')
+plt.scatter(stat_params[:, 0][five], stat_params[:, 1][five], color='pink', edgecolors='k', linewidths=0.8,
+            label='Label Five')
+plt.xlabel('Residual Standard Deviation: Full Day')
+plt.ylabel('Residual Standard Deviation: Noon')
 plt.legend()
 plt.show()
 plt.savefig('/Users/tervin/pyr_classifier/images/clutering_visualized.png')
 
+# 3d plot
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.scatter3D(stat_params[:, 0][zero], stat_params[:, 1][zero],  stat_params[:, 2][zero], color='red', edgecolors='k', linewidths=0.8,
+            label='Label Zero')
+ax.scatter3D(stat_params[:, 0][one], stat_params[:, 1][one], stat_params[:, 2][one], color='orange', edgecolors='k', linewidths=0.8,
+            label='Label One')
+ax.scatter3D(stat_params[:, 0][two], stat_params[:, 1][two], stat_params[:, 2][two], color='green', edgecolors='k', linewidths=0.8,
+            label='Label Two')
+ax.scatter3D(stat_params[:, 0][three], stat_params[:, 1][three], stat_params[:, 2][three], color='blue', edgecolors='k', linewidths=0.8,
+            label='Label Three')
+ax.scatter3D(stat_params[:, 0][four], stat_params[:, 1][four], stat_params[:, 2][four], color='purple', edgecolors='k', linewidths=0.8,
+            label='Label Four')
+ax.scatter3D(stat_params[:, 0][five], stat_params[:, 1][five], stat_params[:, 2][five], color='pink', edgecolors='k', linewidths=0.8,
+            label='Label Five')
+ax.set_xlabel('Residual Standard Deviation')
+ax.set_ylabel('Residual Standard Deviation: Noon')
+ax.set_zlabel('Solar Noon Mean')
+plt.legend()
+plt.show()
+
 # plot flux from each cluster
 plot_flux = np.array(full_flux)
 plt.plot(plot_flux[zero][0], color='red', label='Label Zero')
+plt.show()
 plt.plot(plot_flux[one][0], color='orange', label='Label One')
 plt.plot(plot_flux[two][0], color='green', label='Label Two')
 plt.plot(plot_flux[three][0], color='blue', label='Label Three')
@@ -129,8 +160,8 @@ plt.show()
 plt.savefig('/Users/tervin/pyr_classifier/images/example_plots.png')
 
 # plot all of them to look
-ll = [two, four, zero, one, three]
-col = ['green', 'purple', 'red', 'orange', 'blue']
+ll = [two, five, zero, three, four, one]
+col = ['purple', 'green', 'red', 'pink', 'blue', 'orange']
 for i, l in enumerate(ll):
     for j in l[0]:
         plt.plot(plot_flux[j], color=col[i])
@@ -138,7 +169,7 @@ for i, l in enumerate(ll):
         plt.show()
 
 # trying to cluster just the good data
-good_data = np.where(labels == 2)
+good_data = np.where(labels == 0)
 good_params = stat_params[good_data]
 kmeans_good = KMeans(n_clusters=2, random_state=0).fit(good_params)
 labels_good = kmeans_good.labels_
@@ -151,8 +182,10 @@ one = np.where(labels_good == 1)
 # four = np.where(labels == 4)
 # five = np.where(labels == 5)
 x = np.arange(0, len(days))
-plt.scatter(good_params[:,0][zero], good_params[:,1][zero], color='red', edgecolors='k', linewidths=0.8, label='Label Zero')
-plt.scatter(good_params[:,0][one], good_params[:,1][one], color='orange', edgecolors='k', linewidths=0.8, label='Label One')
+plt.scatter(good_params[:, 0][zero], good_params[:, 1][zero], color='red', edgecolors='k', linewidths=0.8,
+            label='Label Zero')
+plt.scatter(good_params[:, 0][one], good_params[:, 1][one], color='orange', edgecolors='k', linewidths=0.8,
+            label='Label One')
 # plt.scatter(stat_params[:,0][two], stat_params[:,1][two], color='green', edgecolors='k', linewidths=0.8, label='Label Two')
 # plt.scatter(stat_params[:,0][three], stat_params[:,1][three], color='blue', edgecolors='k', linewidths=0.8, label='Label Three')
 # plt.scatter(stat_params[:,0][four], stat_params[:,1][four], color='purple', edgecolors='k', linewidths=0.8, label='Label Four')
@@ -166,12 +199,11 @@ plt.show()
 import pickle
 
 # save model
-pickle.dump(kmeans, open("../model.pkl", "wb"))
+pickle.dump(kmeans, open("model2.pkl", "wb"))
 
 # load model
-model = pickle.load(open("../model.pkl", "rb"))
+model = pickle.load(open("model.pkl", "rb"))
 model.predict(stat_params)
-
 
 #
 # pyr_file = '/Users/tervin/sdo_hmi_rvs/pyr_data/neid_ljpyrohelio_chv0_20210405.tel'
