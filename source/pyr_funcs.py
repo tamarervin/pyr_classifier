@@ -133,10 +133,12 @@ def tsi_model(days, full_flux, lat=32.2, lon=-111, tz='US/Arizona', elevation=73
     :param str tz: Timezone
     :param int elevation: elevation value
     :param str name: location name
-    :returns:full_model - full flux model
-    :return: noon_model - solar noon flux model
-    :rtype: List[float]
-    :rtype: List[float]
+    :returns:
+        - full_model - full flux model  
+        - noon_model - solar noon flux model
+    :rtype:
+        - List[float]
+        - List[float]
     """
 
     # location using pvlib package -- latitude, longitude, timezone, altitude, latitude
