@@ -1280,8 +1280,10 @@ and classify it.</p>
   </thead>
   <tbody>
     <tr>
-      <td><code>List[float]</code></td>
-      <td><p>noon_model - solar noon flux model</p></td>
+      <td><code>- List[float] - List[float]</code></td>
+      <td><ul>
+<li>full_model - full flux model   - noon_model - solar noon flux model</li>
+</ul></td>
     </tr>
   </tbody>
 </table>
@@ -1298,10 +1300,12 @@ and classify it.</p>
 <span class="sd">    :param str tz: Timezone</span>
 <span class="sd">    :param int elevation: elevation value</span>
 <span class="sd">    :param str name: location name</span>
-<span class="sd">    :returns:full_model - full flux model</span>
-<span class="sd">    :return: noon_model - solar noon flux model</span>
-<span class="sd">    :rtype: List[float]</span>
-<span class="sd">    :rtype: List[float]</span>
+<span class="sd">    :returns:</span>
+<span class="sd">        - full_model - full flux model  </span>
+<span class="sd">        - noon_model - solar noon flux model</span>
+<span class="sd">    :rtype:</span>
+<span class="sd">        - List[float]</span>
+<span class="sd">        - List[float]</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># location using pvlib package -- latitude, longitude, timezone, altitude, latitude</span>
