@@ -16,7 +16,8 @@ from sklearn.cluster import KMeans
 # get the files
 dir_path = "/Users/tervin/pyr_classifier/pyr_data"
 files = os.listdir(dir_path)
-all_files = sorted(files)
+files = sorted(files)
+# files = all_files[33:37]
 
 # parse files
 # days, full_flux, noon_flux = pf.parse_files(files, dir_path)
@@ -43,7 +44,7 @@ times_list = np.array(times_list)
 # get unique dates
 unique_days = np.unique(dates_list)
 unique_days = sorted(unique_days)
-unique_days = [unique_days[x] for x in np.arange(0, len(unique_days), 10)]
+# unique_days = [unique_days[x] for x in np.arange(0, len(unique_days), 8)]
 
 # parse dates
 full_flux, noon_flux, days = [], [], []
@@ -70,7 +71,7 @@ name = 'Tucson'
 full_model, noon_model = pf.tsi_model(days, full_flux, lat, lon, tz, elevation, name)
 
 # calculate statistical parameters
-stat_params = pf.stat_parameters(days, full_flux, noon_flux, full_model)
+stat_params = pf.stat_parameters(days, full_flux, noon_flux, full_model, noon_model)
 
 # use elbow method to determine best number of clusters
 sum_of_squared_distances = []
@@ -88,16 +89,20 @@ plt.show()
 plt.savefig('/Users/tervin/pyr_classifier/images/elbow_method.png')
 
 # create actual model
-kmeans = KMeans(n_clusters=6, random_state=0).fit(stat_params)
+# use = np.where(stat_params[:, 0]<500)
+# good_days = np.array(days)[use]
+# good_flux = np.array(full_flux)[use]
+# stat_params = stat_params[use]
+kmeans = KMeans(n_clusters=6, init='k-means++', random_state=0).fit(stat_params)
 labels = kmeans.labels_
 
-# plot labels
-plt.scatter(np.array(days), np.array(labels), color='lightblue', edgecolor='k', linewidths=0.8)
-plt.xlabel('Days')
-plt.ylabel('Classes')
-plt.title('Trained Classifier')
-plt.show()
-
+# # plot labels
+# plt.scatter(np.array(days), np.array(labels), color='lightblue', edgecolor='k', linewidths=0.8)
+# plt.xlabel('Days')
+# plt.ylabel('Classes')
+# plt.title('Trained Classifier')
+# plt.show()
+#
 # plot clustering
 zero = np.where(labels == 0)
 one = np.where(labels == 1)
@@ -119,10 +124,10 @@ plt.scatter(stat_params[:, 0][four], stat_params[:, 1][four], color='purple', ed
 plt.scatter(stat_params[:, 0][five], stat_params[:, 1][five], color='pink', edgecolors='k', linewidths=0.8,
             label='Label Five')
 plt.xlabel('Residual Standard Deviation: Full Day')
-plt.ylabel('Residual Standard Deviation: Noon')
+plt.ylabel('Solar Noon Mean')
 plt.legend()
 plt.show()
-plt.savefig('/Users/tervin/pyr_classifier/images/clutering_visualized.png')
+# plt.savefig('/Users/tervin/pyr_classifier/images/clutering_visualized.png')
 
 # 3d plot
 fig = plt.figure()
@@ -140,47 +145,70 @@ ax.scatter3D(stat_params[:, 0][four], stat_params[:, 1][four], stat_params[:, 2]
 ax.scatter3D(stat_params[:, 0][five], stat_params[:, 1][five], stat_params[:, 2][five], color='pink', edgecolors='k', linewidths=0.8,
             label='Label Five')
 ax.set_xlabel('Residual Standard Deviation')
-ax.set_ylabel('Residual Standard Deviation: Noon')
+ax.set_ylabel('Noon Standard Deviation')
 ax.set_zlabel('Solar Noon Mean')
 plt.legend()
 plt.show()
 
-# plot flux from each cluster
-plot_flux = np.array(full_flux)
-plt.plot(plot_flux[zero][0], color='red', label='Label Zero')
-plt.show()
-plt.plot(plot_flux[one][0], color='orange', label='Label One')
-plt.plot(plot_flux[two][0], color='green', label='Label Two')
-plt.plot(plot_flux[three][0], color='blue', label='Label Three')
-plt.plot(plot_flux[four][0], color='purple', label='Label Four')
-plt.xlabel('Time (s)')
-plt.ylabel('Flux')
-plt.legend()
-plt.show()
-plt.savefig('/Users/tervin/pyr_classifier/images/example_plots.png')
+# plot clustering
+for i, l in enumerate(full_flux):
+    # if labels[i] == 1:
+    plt.plot(l, color='b')
+    plt.title(str(labels[i]))
+    plt.show()
 
-# plot all of them to look
-ll = [two, five, zero, three, four, one]
-col = ['purple', 'green', 'red', 'pink', 'blue', 'orange']
-for i, l in enumerate(ll):
-    for j in l[0]:
-        plt.plot(plot_flux[j], color=col[i])
-        plt.title(str(days[j]))
-        plt.show()
+
+# use pickle to save and load model
+import pickle
+
+# save model
+pickle.dump(kmeans, open("model.pkl", "wb"))
+# pickle.dump(kmeans_good, open("model2.pkl", "wb"))
+
+# load model
+model = pickle.load(open("model.pkl", "rb"))
+model.predict(stat_params)
 
 # trying to cluster just the good data
 good_data = np.where(labels == 0)
 good_params = stat_params[good_data]
-kmeans_good = KMeans(n_clusters=2, random_state=0).fit(good_params)
+good_flux = np.array(full_flux)[good_data]
+good_days = np.array(days)[good_data]
+good_params = [x[1:] for x in good_params]
+good_params = np.array(good_params)
+kmeans_good = KMeans(n_clusters=4, random_state=0).fit(good_params)
 labels_good = kmeans_good.labels_
 
-# plot clustering
+# visualize
 zero = np.where(labels_good == 0)
 one = np.where(labels_good == 1)
-# two = np.where(labels == 2)
-# three = np.where(labels == 3)
-# four = np.where(labels == 4)
-# five = np.where(labels == 5)
+two = np.where(labels_good == 2)
+three = np.where(labels_good == 3)
+fig = plt.figure()
+ax = plt.axes(projection='3d')
+ax.scatter3D(good_params[:, 0][zero], good_params[:, 1][zero],  good_params[:, 2][zero], color='red', edgecolors='k', linewidths=0.8,
+            label='Label Zero')
+ax.scatter3D(good_params[:, 0][one], good_params[:, 1][one], good_params[:, 2][one], color='orange', edgecolors='k', linewidths=0.8,
+            label='Label One')
+ax.scatter3D(good_params[:, 0][two], good_params[:, 1][two], good_params[:, 2][two], color='green', edgecolors='k', linewidths=0.8,
+            label='Label Two')
+ax.scatter3D(good_params[:, 0][three], good_params[:, 1][three], good_params[:, 2][three], color='blue', edgecolors='k', linewidths=0.8,
+            label='Label Three')
+ax.set_xlabel('Residual Standard Deviation: Noon')
+ax.set_ylabel('Solar Noon Mean')
+ax.set_zlabel('Outliers')
+plt.legend()
+plt.show()
+
+
+
+labels_good = []
+for l in good_params:
+    if l[0] >= 4 or l[1] < 1000 or l[2] != 0:
+        labels_good.append(1)
+    else:
+        labels_good.append(0)
+labels_good = np.array(labels_good)
 x = np.arange(0, len(days))
 plt.scatter(good_params[:, 0][zero], good_params[:, 1][zero], color='red', edgecolors='k', linewidths=0.8,
             label='Label Zero')
@@ -195,15 +223,6 @@ plt.ylabel('Solar Noon Mean')
 plt.legend()
 plt.show()
 
-# use pickle to save and load model
-import pickle
-
-# save model
-pickle.dump(kmeans, open("model2.pkl", "wb"))
-
-# load model
-model = pickle.load(open("model.pkl", "rb"))
-model.predict(stat_params)
 
 #
 # pyr_file = '/Users/tervin/sdo_hmi_rvs/pyr_data/neid_ljpyrohelio_chv0_20210405.tel'

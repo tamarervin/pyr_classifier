@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta, time
 from pvlib import location, clearsky
+from scipy import stats
 
 
 def read_pyr(pyr_file):
@@ -134,7 +135,7 @@ def tsi_model(days, full_flux, lat=32.2, lon=-111, tz='US/Arizona', elevation=73
     :param int elevation: elevation value
     :param str name: location name
     :returns:
-        - full_model - full flux model  
+        - full_model - full flux model
         - noon_model - solar noon flux model
     :rtype:
         - List[float]
@@ -183,21 +184,22 @@ def stat_parameters(days, full_flux, noon_flux, full_model, noon_model):
     """
 
     # scaled residual standard deviation
-    scal_f_std, scal_n_std, scal_s_mean, good_flux, good_model = [], [], [], [], []
+    scal_f_std, scal_n_std, scal_n_mean, n_std = [], [], [], []
     for i, d in enumerate(days):
-        good_flux.append(full_flux[i])
-        good_model.append(full_model[i])
         f_res = full_flux[i] - (full_model[i] * 1.08)
         scal_f_std.append(np.std(f_res))
         f_res = noon_flux[i] - (noon_model[i] * 1.08)
         scal_n_std.append(np.std(f_res))
-        scal_s_mean.append((np.mean(noon_flux[i])))
+        scal_n_mean.append((np.mean(noon_flux[i])))
+        n_std.append(np.std(noon_flux[i]))
     scal_f_std = np.array(scal_f_std)
-    scal_s_mean = np.array(scal_s_mean)
+    scal_n_mean = np.array(scal_n_mean)
     scal_n_std = np.array(scal_n_std)
+    # s_std = np.array(s_std)
+    n_std = np.array(n_std)
 
     # ([std values of scaled full flux array, mean values of scaled solar noon flux array])
-    stat_params = np.column_stack((scal_f_std, scal_n_std, scal_s_mean))
+    stat_params = np.column_stack((scal_f_std, n_std, scal_n_mean))
 
     return stat_params
 
@@ -221,12 +223,12 @@ def classify_days(days, stats_params, model_path, csv_name):
     labels = np.array(labels)
 
     # map labels to correct class
-    # mapping = {4: 0, 2: 1, 0: 2, 5: 3, 3: 4, 1: 5}
-    # mapped = [mapping[i] for i in labels]
-    # mapped = np.array(mapped)
+    mapping = {5: 0, 1: 1, 0: 2, 4: 4, 3: 5}
+    mapped = [mapping[i] for i in labels]
+    mapped = np.array(mapped)
 
     # create array of dates and labels
-    date_labels = np.column_stack((days, labels))
+    date_labels = np.column_stack((days, mapped))
 
     # save to csv
     df = save_to_csv(date_labels, csv_name)
@@ -234,7 +236,7 @@ def classify_days(days, stats_params, model_path, csv_name):
     return df
 
 
-def save_to_csv(date_labels, csv_name):
+def save_to_csv(date_labels, csv_name=None):
     """
     function to save labeled dates to csv
     :param date_labels: array with dates and corresponding labels
@@ -246,15 +248,16 @@ def save_to_csv(date_labels, csv_name):
     df = pd.DataFrame(date_labels)
 
     # add column headers
-    df.columns = ['Date', 'Label']
+    df.columns = ['date', 'label']
 
     # save csv
-    df.to_csv(csv_name)
+    if csv_name is not None:
+        df.to_csv(csv_name)
 
     return df
 
 
-def classifier_model(dir_path, model_path, csv_name):
+def classify_files(dir_path, model_path, csv_name=None):
     """
     function for full classifier model
 
@@ -283,10 +286,43 @@ def classifier_model(dir_path, model_path, csv_name):
     full_model, noon_model = tsi_model(days, full_flux, lat, lon, tz, elevation, name)
 
     # calculate statistical parameters
-    stats_params = stat_parameters(days, full_flux, noon_flux, full_model)
+    stats_params = stat_parameters(days, full_flux, noon_flux, full_model, noon_model)
 
     # classify dates based on trained model
     date_labels = classify_days(days, stats_params, model_path, csv_name)
 
     return date_labels
 
+
+def classify_array(dates, flux, model_path, csv_name=None):
+    """
+    function for full classifier model
+
+    :param List[DateTime] dates: list of dates
+    :param List[float] flux: list of flux values
+    :param str model_path: path to clustering model
+    :param str csv_name: path to save csv
+    :return: dataframe with dates and labels
+    :rtype: DataFrame
+    """
+
+    # parse array
+    days, full_flux, noon_flux = parse_dates(dates, flux)
+
+    # default location parameters - NEID spectrometer (Kitt Peak, Tuscon AZ)
+    lat = 32.2
+    lon = -111
+    tz = 'US/Arizona'
+    elevation = 735
+    name = 'Tucson'
+
+    # create TSI model
+    full_model, noon_model = tsi_model(days, full_flux, lat, lon, tz, elevation, name)
+
+    # calculate statistical parameters
+    stats_params = stat_parameters(days, full_flux, noon_flux, full_model, noon_model)
+
+    # classify dates based on trained model
+    date_labels = classify_days(days, stats_params, model_path, csv_name)
+
+    return date_labels
